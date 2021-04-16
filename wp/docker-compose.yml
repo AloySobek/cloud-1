@@ -1,0 +1,57 @@
+version: "3.9"
+    
+services:
+  db:
+    image: mysql:5.7
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: somewordpress
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+    
+  wordpress:
+    depends_on:
+      - db
+    image: wordpress:latest
+    ports:
+      - "8000:80"
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      # Set WP-Stateless settings https://wp-stateless.github.io/docs/constants/
+      WORDPRESS_CONFIG_EXTRA: |
+        define( 'WP_STATELESS_MEDIA_MODE', 'stateless' );
+        define( 'WP_STATELESS_MEDIA_BUCKET', '${WP_STATELESS_MEDIA_BUCKET}' );
+        define( 'WP_STATELESS_MEDIA_CACHE_BUSTING', 'true' );
+        define( 'WP_STATELESS_MEDIA_JSON_KEY', '${WP_STATELESS_MEDIA_JSON_KEY}' );
+    volumes:
+      - wp_data:/var/www/html/
+  wp-cli:
+    image: wordpress:cli
+    depends_on:
+      - db
+      - wordpress
+    volumes:
+      - ./entrypoint.sh:/entrypoint.sh # shared with wordpress service
+      - wp_data:/var/www/html/ # shared with wordpress service
+    user: "33"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      SITE_URL: http://localhost:8000
+      SITE_TITLE: cloud-1
+      SITE_ADMIN_USER: root
+      SITE_ADMIN_PASS: gpr1CL1ty3qCln5
+      SITE_ADMIN_EMAIL: empty@email.com
+    entrypoint: /entrypoint.sh
+volumes:
+  db_data: {}
+  wp_data: {}
