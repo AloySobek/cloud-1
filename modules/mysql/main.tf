@@ -1,109 +1,138 @@
 terraform {
   required_providers {
-    kubernetes = {
-      source = "hashicorp/kubernetes"
-    }
+    kubernetes = { source = "hashicorp/kubernetes" }
+    helm       = { source = "hashicorp/helm" }
   }
 }
 
-provider "kubernetes" {
-  config_path = "~/.kube/config"
+provider "kubernetes" { config_path = "~/.kube/config" }
+provider "helm" {
+  kubernetes { config_path = "~/.kube/config" }
 }
 
-resource "kubernetes_secret" "mysql-credentials-secret" {
+resource "kubernetes_namespace" "storage" {
   metadata {
-    name = "mysql-credentials-secret"
-    labels = {
-      app = "wordpress"
-    }
+    name = "storage"
+  }
+}
+
+resource "kubernetes_secret" "mysql_root_passwords" {
+  metadata {
+    name = "mysql-root-passwords"
+    namespace = "storage"
   }
   data = {
-    "root-password" = var.mysql_root_password
+    "mysql-root-password" = "6h/%S3}d+QstVrEP"
+    "mysql-replication-password" = "6h/%S3}d+QstVrEP"
+    "mysql-password" = "wordpress"
   }
 }
 
-resource "kubernetes_service" "mysql-service" {
+resource "kubernetes_config_map" "mysql_primary_configuration" {
   metadata {
-    name = "mysql-service"
-    labels = {
-      app = "wordpress"
-    }
+    name = "mysql-primary-configuration"
+    namespace = "storage"
   }
-  spec {
-    selector = {
-      app = "wordpress"
-    }
-    port {
-      port = 3306
-      target_port = 3306
-    }
+  data = {
+    "configuration" = <<EOF
+[mysqld]
+default_authentication_plugin=mysql_native_password
+skip-name-resolve
+explicit_defaults_for_timestamp
+basedir=/opt/bitnami/mysql
+plugin_dir=/opt/bitnami/mysql/plugin
+port=3306
+socket=/opt/bitnami/mysql/tmp/mysql.sock
+datadir=/bitnami/mysql/data
+tmpdir=/opt/bitnami/mysql/tmp
+max_allowed_packet=16M
+bind-address=0.0.0.0
+pid-file=/opt/bitnami/mysql/tmp/mysqld.pid
+log-error=/opt/bitnami/mysql/logs/mysqld.log
+character-set-server=UTF8
+collation-server=utf8_general_ci
+[client]
+port=3306
+socket=/opt/bitnami/mysql/tmp/mysql.sock
+default-character-set=UTF8
+plugin_dir=/opt/bitnami/mysql/plugin
+[manager]
+port=3306
+socket=/opt/bitnami/mysql/tmp/mysql.sock
+pid-file=/opt/bitnami/mysql/tmp/mysqld.pid
+EOF
   }
 }
 
-resource "kubernetes_persistent_volume_claim" "mysql-pvc" {
+resource "kubernetes_config_map" "mysql_secondary_configuration" {
   metadata {
-    name = "mysql-pvc"
-    labels = {
-      app = "wordpress"
-    }
+    name = "mysql-secondary-configuration"
+    namespace = "storage"
   }
-  spec {
-    access_modes = ["ReadWriteOnce"]
-    resources {
-      requests = {
-        storage = "16Gi"
-      }
-    }
+  data = {
+    "configuration" = <<EOF
+[mysqld]
+default_authentication_plugin=mysql_native_password
+skip-name-resolve
+explicit_defaults_for_timestamp
+basedir=/opt/bitnami/mysql
+port=3306
+socket=/opt/bitnami/mysql/tmp/mysql.sock
+datadir=/bitnami/mysql/data
+tmpdir=/opt/bitnami/mysql/tmp
+max_allowed_packet=16M
+bind-address=0.0.0.0
+pid-file=/opt/bitnami/mysql/tmp/mysqld.pid
+log-error=/opt/bitnami/mysql/logs/mysqld.log
+character-set-server=UTF8
+collation-server=utf8_general_ci
+[client]
+port=3306
+socket=/opt/bitnami/mysql/tmp/mysql.sock
+default-character-set=UTF8
+[manager]
+port=3306
+socket=/opt/bitnami/mysql/tmp/mysql.sock
+pid-file=/opt/bitnami/mysql/tmp/mysqld.pid
+EOF
   }
 }
 
-resource "kubernetes_deployment" "mysql-deployment" {
-  metadata {
-    name = "mysql-deployment"
-    labels = {
-      app = "wordpress"
-    }
-  }
-  spec {
-    selector {
-      match_labels = {
-        app = "wordpress"  
-      }
-    }
-    template {
-      metadata {
-        labels = {
-          app = "wordpress"
-        }
-      }
-      spec {
-        container {
-          name = "mysql-container"
-          image = "mysql:5.6"
-          env {
-            name = "MYSQL_ROOT_PASSWORD"
-            value_from {
-              secret_key_ref {
-                name = "mysql-credentials-secret"
-                key = "root-password"
-              }
-            }
-          }
-          port {
-            container_port = 3306
-          }
-          volume_mount {
-            name = "mysql-pv"
-            mount_path = "/var/lib/mysql"
-          }
-        }
-        volume {
-          name = "mysql-pv"
-          persistent_volume_claim {
-            claim_name = "mysql-pvc"
-          }
-        }
-      }
-    }
-  }
+resource "helm_release" "mysql" {
+  name = "mysql"
+  namespace = "storage"
+  repository = "https://charts.bitnami.com/bitnami"
+  chart = "mysql"
+  values = [
+<<YAML
+commonLabels:
+  app: wordpress
+  tier: backend
+  service: mysql
+auth:
+  database: wordpress
+  username: wordpress
+  replicationUser: replicator
+  existingSecret: mysql-root-passwords
+primary:
+  existingConfigMap: mysql-primary-configuration
+  resources:
+    limits:
+      cpu: 1000m 
+      memory: 4096Mi
+  persistence:
+    storageClass: premium-rwo 
+    size: 16Gi
+secondary:
+  replicaCount: 1 
+  existingConfigMap: mysql-secondary-configuration
+  resources:
+    limits:
+      cpu: 500m 
+      memory: 1024Mi
+  persistence:
+    storageClass: standard
+    size: 16Gi
+YAML
+  ]
 }

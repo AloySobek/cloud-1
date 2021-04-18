@@ -1,2 +1,2 @@
-variable "mysql_root_password" { type = string }
-variable "address_name"        { type = string }
+variable "bucket_sa_credentials_path" { type = string }
+variable "bucket_name"                { type = string }
