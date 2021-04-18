@@ -36,4 +36,5 @@ wp core install --path="/var/www/html" --url="$SITE_URL" --title="$SITE_TITLE" -
 
 # Instull plugins
 wp plugin install wp-stateless --activate
+wp plugin install really-simple-ssl --activate
 

@@ -30,6 +30,8 @@ services:
         define( 'WP_STATELESS_MEDIA_BUCKET', '${WP_STATELESS_MEDIA_BUCKET}' );
         define( 'WP_STATELESS_MEDIA_CACHE_BUSTING', 'true' );
         define( 'WP_STATELESS_MEDIA_JSON_KEY', '${WP_STATELESS_MEDIA_JSON_KEY}' );
+        define('WP_HOME', '${WP_HOME}');
+        define('WP_SITEURL', '${WP_SITEURL}');
     volumes:
       - wp_data:/var/www/html/
   wp-init:
