@@ -5,27 +5,23 @@ terraform {
   }
 }
 
-provider "kubernetes" { config_path = "~/.kube/config" }
-provider "helm" {
-  kubernetes { config_path = "~/.kube/config" }
-}
-
 resource "kubernetes_namespace" "storage" {
   metadata {
     name = "storage"
   }
 }
 
-resource "kubernetes_secret" "mysql_root_passwords" {
+resource "kubernetes_secret" "mysql_passwords" {
   metadata {
-    name = "mysql-root-passwords"
+    name = "mysql-passwords"
     namespace = "storage"
   }
   data = {
-    "mysql-root-password" = "6h/%S3}d+QstVrEP"
-    "mysql-replication-password" = "6h/%S3}d+QstVrEP"
-    "mysql-password" = "wordpress"
+    "mysql-root-password" = "${var.mysql_root_password}"
+    "mysql-replication-password" = "${var.mysql_replication_password}"
+    "mysql-password" = "${var.mysql_password}"
   }
+  depends_on = [kubernetes_namespace.storage]
 }
 
 resource "kubernetes_config_map" "mysql_primary_configuration" {
@@ -62,6 +58,7 @@ socket=/opt/bitnami/mysql/tmp/mysql.sock
 pid-file=/opt/bitnami/mysql/tmp/mysqld.pid
 EOF
   }
+  depends_on = [kubernetes_namespace.storage]
 }
 
 resource "kubernetes_config_map" "mysql_secondary_configuration" {
@@ -96,6 +93,7 @@ socket=/opt/bitnami/mysql/tmp/mysql.sock
 pid-file=/opt/bitnami/mysql/tmp/mysqld.pid
 EOF
   }
+  depends_on = [kubernetes_namespace.storage]
 }
 
 resource "helm_release" "mysql" {
@@ -109,11 +107,12 @@ commonLabels:
   app: wordpress
   tier: backend
   service: mysql
+architecture: replication
 auth:
   database: wordpress
   username: wordpress
   replicationUser: replicator
-  existingSecret: mysql-root-passwords
+  existingSecret: mysql-passwords
 primary:
   existingConfigMap: mysql-primary-configuration
   resources:
@@ -134,5 +133,10 @@ secondary:
     storageClass: standard
     size: 16Gi
 YAML
+  ]
+  depends_on = [
+    kubernetes_secret.mysql_passwords,
+    kubernetes_config_map.mysql_primary_configuration,
+    kubernetes_config_map.mysql_secondary_configuration
   ]
 }

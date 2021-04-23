@@ -1,2 +1,2 @@
-variable "bucket_sa_credentials_path" { type = string }
-variable "bucket_name"                { type = string }
+variable "wordpress_password" { type = string }
+variable "mysql_password"     { type = string }

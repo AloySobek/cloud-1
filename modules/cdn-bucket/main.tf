@@ -1,14 +1,7 @@
 terraform {
   required_providers {
-    google = { source = "hashicorp/google" }
+    google = { }
   }
-}
-
-provider "google" {
-  credentials = var.credentials_path
-  project = var.project_id
-  region = join("-", [split("-", var.zone)[0], split("-", var.zone)[1]])
-  zone = var.zone
 }
 
 resource "google_storage_bucket" "wp_media" {
