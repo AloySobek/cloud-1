@@ -1,7 +1,25 @@
 terraform {
   required_providers {
-    kubernetes = { source = "hashicorp/kubernetes" }
-    kubectl    = { source  = "gavinbunney/kubectl" }
+    kubernetes-alpha = { source = "hashicorp/kubernetes-alpha" }
+    kubernetes       = { source = "hashicorp/kubernetes" }
+    kubectl          = { source  = "gavinbunney/kubectl" }
+  }
+}
+
+resource "kubernetes_manifest" "enable_cdn" {
+  provider = kubernetes-alpha
+  manifest = {
+    "apiVersion" = "cloud.google.com/v1beta1"
+    "kind" = "BackendConfig"
+    "metadata" = {
+      "name" = "wordpress-cdn"
+      "namespace" = "default"
+    }
+    "spec" = {
+      "cdn" = {
+        "enabled" = "true"
+      }
+    }
   }
 }
 
@@ -15,6 +33,33 @@ resource "kubernetes_ingress" "wordpress_ingress" {
   }
   spec {
     tls {
+      hosts = ["cloud-1-nginx.starquark.com"]
+      secret_name = "cloud-1-nginx.starquark.com"
+    }
+    rule {
+      host = "cloud-1-nginx.starquark.com"
+      http {
+        path {
+          path = "/"
+          backend {
+            service_name = "wordpress"
+            service_port = 80
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_ingress" "wordpress_ingress_gce" {
+  metadata {
+    name = "wordpress-ingress-gce"
+    annotations = {
+      "kubernetes.io/ingress.class" = "gce"
+    }
+  }
+  spec {
+    tls {
       hosts = ["cloud-1.starquark.com"]
       secret_name = "cloud-1.starquark.com"
     }
@@ -22,7 +67,7 @@ resource "kubernetes_ingress" "wordpress_ingress" {
       host = "cloud-1.starquark.com"
       http {
         path {
-          path = "/"
+          path = "/*"
           backend {
             service_name = "wordpress"
             service_port = 80
@@ -61,7 +106,9 @@ wordpressBlogName: Blog
 wordpressTablePrefix: wp_
 wordpressScheme: http
 service:
-  type: ClusterIP
+  type: NodePort
+  annotations:
+    cloud.google.com/backend-config: '{"ports": {"80":"wordpress-cdn"}}'
 persistence:
   storageClass: nfs
   size: 16Gi

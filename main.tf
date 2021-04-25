@@ -4,16 +4,18 @@ terraform {
     prefix  = "terraform/state"
   }
   required_providers {
-    kubernetes = { source = "hashicorp/kubernetes" }
-    kubectl    = { source = "gavinbunney/kubectl" }
-    google     = { source = "hashicorp/google" }
-    helm       = { source = "hashicorp/helm" }
+    kubernetes-alpha = { source = "hashicorp/kubernetes-alpha" }
+    kubernetes       = { source = "hashicorp/kubernetes" }
+    kubectl          = { source = "gavinbunney/kubectl" }
+    google           = { source = "hashicorp/google" }
+    helm             = { source = "hashicorp/helm" }
   }
 }
 
-provider "kubernetes" { config_path = "~/.kube/config" }
-provider "kubectl"    { config_path = "~/.kube/config" }
-provider "google"     { alias = "token" }
+provider "kubernetes-alpha" { config_path = "~/.kube/config" }
+provider "kubernetes"       { config_path = "~/.kube/config" }
+provider "kubectl"          { config_path = "~/.kube/config" }
+provider "google"           { alias = "token" }
 provider "helm" {
   kubernetes { config_path = "~/.kube/config" }
 }
@@ -69,7 +71,7 @@ module "kubernetes_setup" {
   dns_admin_sa_credentials_path = "~/.config/gcloud/dns-admin.json"
   acme_email = "super.rustamm@gmail.com"
   project_id = var.project_id
-  dns_entry = "cloud-1.starquark.com"
+  dns_entry = "cloud-1-nginx.starquark.com"
   dns_zone_name = "cloud-1-dns-zone"
   depends_on = [module.kubernetes_cluster]
 }
